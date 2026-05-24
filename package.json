@@ -1,0 +1,20 @@
+{
+  "name": "placeur",
+  "version": "0.0.1",
+  "description": "Placing algorithm for (text) boxes",
+  "homepage": "https://github.com/akkurat/placeur#readme",
+  "bugs": {
+    "url": "https://github.com/akkurat/placeur/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/akkurat/placeur.git"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
