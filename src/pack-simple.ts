@@ -1,5 +1,5 @@
 import { pack2D, type Box2D } from 'binpackingjs/2d'
-import type { Bin, Block, PlacedBlock } from './api-types'
+import type { Bin, Block, PlacedBlock } from './api-types.js'
 
 type Entry = { block: Block; w: number; h: number }
 

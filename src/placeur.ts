@@ -1,6 +1,6 @@
-import type { Bin, Block, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult } from './api-types'
-import { packColumns } from './pack-columns'
-import { packSimple } from './pack-simple'
+import type { Bin, Block, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult } from './api-types.js'
+import { packColumns } from './pack-columns.js'
+import { packSimple } from './pack-simple.js'
 
 function packBin(bin: Bin, blocks: Block[]): { placed: PlacedBlock[], remaining: Block[] } {
   if (bin.columns) {

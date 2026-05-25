@@ -1,4 +1,4 @@
-import type { Bin, Block, PlacedBlock } from './api-types'
+import type { Bin, Block, PlacedBlock } from './api-types.js'
 
 export function packColumns(bin: Bin, blocks: Block[]): { placed: PlacedBlock[], remaining: Block[] } {
   const { count, gutter } = bin.columns!
