@@ -1,45 +1,6 @@
 import { pack2D, type Box2D } from 'binpackingjs/2d'
+import type { Bin, Block, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult } from './api-types'
 
-export interface Block {
-  heightForWidth(width: number): number
-  minWidth?: number
-  maxWidth?: number
-}
-
-export interface ColumnLayout {
-  count: number
-  gutter: number
-}
-
-export interface Bin {
-  width: number
-  height: number
-  columns?: ColumnLayout
-}
-
-export interface PlacedBlock {
-  readonly block: Block
-  readonly width: number
-  readonly height: number
-  readonly x: number
-  readonly y: number
-}
-
-export interface PlacedBin {
-  readonly bin: Bin
-  readonly blocks: PlacedBlock[]
-  readonly efficiency: number
-}
-
-export interface PlaceurOptions {
-  bins: Bin[]
-  blocks: Block[]
-}
-
-export interface PlaceurResult {
-  readonly bins: PlacedBin[]
-  readonly unpacked: Block[]
-}
 
 function packColumns(bin: Bin, blocks: Block[]): { placed: PlacedBlock[], remaining: Block[] } {
   const { count, gutter } = bin.columns!
@@ -171,3 +132,5 @@ export function placeur(options: PlaceurOptions): PlaceurResult {
 
   return { bins: placedBins, unpacked: remaining }
 }
+
+export type { Bin, Block, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult } 

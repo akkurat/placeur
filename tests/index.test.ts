@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest'
 import { placeur, type Block, type Bin } from '../src'
 
+let nextId = 0;
+
 function rect(w: number, h: number): Block {
-  return { heightForWidth: () => h }
+  return { id: nextId++ + "", heightForWidth: () => h }
 }
 
 test('places blocks into two columns', () => {
@@ -21,6 +23,16 @@ test('places blocks into two columns', () => {
   expect(a.width).toBe(colW)
   expect(b.x).toBe(colW + 10)
   expect(b.y).toBe(0)
+})
+test('long and short lines', () => {
+  const bin: Bin = { width: 200, height: 200, columns: { count: 4, gutter: 0 } }
+  const blocks: Block[] = [{ id: 'bigefficient', heightForWidth: w => w < 195 ? 300 : 100 },
+  ...[...Array(5).keys()].map(i => ({ id: `smallefficient${i}`, heightForWidth: (w: number) => w > 40 ? 90 : 40 / w * 90 }))
+
+  ]
+  const result = placeur({ bins: [bin], blocks })
+  expect(result.unpacked).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'smallefficient4' })]))
+
 })
 
 test('stacks blocks vertically in same column (sorted by height descending)', () => {
