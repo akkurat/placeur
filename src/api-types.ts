@@ -7,7 +7,7 @@ export interface Bin {
 }
 
 export interface Block {
- id: string 
+  id: string
   heightForWidth(width: number): number
   minWidth?: number
   maxWidth?: number

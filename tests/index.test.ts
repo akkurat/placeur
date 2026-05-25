@@ -76,6 +76,7 @@ test('uses heightForWidth callback with column width', () => {
 
   let calledWith = 0
   const block: Block = {
+    id: 'callback-test',
     heightForWidth(w) {
       calledWith = w
       return 50
@@ -90,9 +91,9 @@ test('sorts blocks by area descending so tallest is placed first', () => {
   const bin: Bin = { width: 100, height: 300, columns: { count: 1, gutter: 0 } }
 
   const blocks: Block[] = [
-    { heightForWidth: () => 50 },
-    { heightForWidth: () => 100 },
-    { heightForWidth: () => 75 },
+    { id: 'a', heightForWidth: () => 50 },
+    { id: 'b', heightForWidth: () => 100 },
+    { id: 'c', heightForWidth: () => 75 },
   ]
 
   const placed = placeur({ bins: [bin], blocks }).bins[0]?.blocks ?? []
@@ -146,7 +147,7 @@ test('places blocks in next column when first column is full', () => {
 
 test('negative heightForWidth skips block', () => {
   const bin: Bin = { width: 100, height: 100, columns: { count: 1, gutter: 0 } }
-  const blocks = [{ heightForWidth: () => -1 }]
+  const blocks = [{ id: 'neg', heightForWidth: () => -1 }]
   const result = placeur({ bins: [bin], blocks })
 
   expect(result.bins).toHaveLength(0)
