@@ -8,6 +8,8 @@ export interface Section {
   content: string
 }
 
+export type Orientation = 'portrait' | 'landscape'
+
 export interface PlaceurPdfOptions {
   inputDir: string
   output?: string
@@ -18,6 +20,7 @@ export interface PlaceurPdfOptions {
   pageWidth?: number
   pageHeight?: number
   margin?: number
+  orientation?: Orientation
 }
 
 function findFiles(dir: string, baseDir: string): Section[] {
@@ -50,16 +53,25 @@ export function generatePdf(options: PlaceurPdfOptions): void {
     pageWidth = 210,
     pageHeight = 297,
     margin = 20,
+    orientation = 'landscape',
   } = options
+
+  let pw = pageWidth
+  let ph = pageHeight
+  if (orientation === 'landscape' && pw < ph) {
+    ;[pw, ph] = [ph, pw]
+  } else if (orientation === 'portrait' && pw > ph) {
+    ;[pw, ph] = [ph, pw]
+  }
 
   const sections = findFiles(inputDir, inputDir)
   if (sections.length === 0) {
     throw new Error('No .txt files found in ' + inputDir)
   }
 
-  const doc = new jsPDF({ unit: 'mm', format: [pageWidth, pageHeight] })
-  const usableWidth = pageWidth - margin * 2
-  const usableHeight = pageHeight - margin * 2
+  const doc = new jsPDF({ unit: 'mm', format: [pw, ph] })
+  const usableWidth = pw - margin * 2
+  const usableHeight = ph - margin * 2
 
   doc.setFontSize(titleFontSize)
   const titleLineHeight = doc.getLineHeight() / doc.internal.scaleFactor

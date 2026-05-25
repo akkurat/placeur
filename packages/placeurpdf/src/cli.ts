@@ -10,12 +10,12 @@ function printHelp() {
 Usage: placeurpdf <input-dir> [options]
 
 Options:
-  -o, --output <file>     Output PDF file (default: output.pdf)
-  -c, --columns <number>  Number of columns (default: 1)
-  -g, --gutter <number>   Column gutter in mm (default: 8)
-  --font-size <number>    Body font size (default: 11)
-  --title-size <number>   Title font size (default: 14)
-  -h, --help              Show this help
+  -o, --output <file>       Output PDF file (default: output.pdf)
+  -c, --columns <number>    Number of columns (default: 1)
+  -g, --gutter <number>     Column gutter in mm (default: 8)
+  --font-size <number>      Body font size (default: 11)
+  --title-size <number>     Title font size (default: 14)
+  --orientation <portrait|landscape>  Page orientation (default: landscape)
   `)
 }
 
@@ -49,6 +49,8 @@ for (let i = 1; i < args.length; i++) {
     opts.fontSize = args[++i]
   } else if (arg === '--title-size') {
     opts.titleSize = args[++i]
+  } else if (arg === '--orientation') {
+    opts.orientation = args[++i]
   }
 }
 
@@ -60,6 +62,7 @@ try {
     gutter: opts.gutter ? Number(opts.gutter) : undefined,
     fontSize: opts.fontSize ? Number(opts.fontSize) : undefined,
     titleFontSize: opts.titleSize ? Number(opts.titleSize) : undefined,
+    orientation: opts.orientation as 'portrait' | 'landscape' | undefined,
   })
 } catch (err) {
   console.error(err instanceof Error ? err.message : err)
