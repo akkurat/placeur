@@ -21,6 +21,7 @@ export interface PlaceurPdfOptions {
   pageHeight?: number
   margin?: number
   orientation?: Orientation
+  debug?: boolean
 }
 
 function findFiles(dir: string, baseDir: string): Section[] {
@@ -42,7 +43,7 @@ function findFiles(dir: string, baseDir: string): Section[] {
   return sections
 }
 
-export function generatePdf(options: PlaceurPdfOptions): void {
+export function generatePdf(options: PlaceurPdfOptions): jsPDF {
   const {
     inputDir,
     output = 'output.pdf',
@@ -54,24 +55,17 @@ export function generatePdf(options: PlaceurPdfOptions): void {
     pageHeight = 297,
     margin = 20,
     orientation = 'landscape',
+    debug = false,
   } = options
-
-  let pw = pageWidth
-  let ph = pageHeight
-  if (orientation === 'landscape' && pw < ph) {
-    ;[pw, ph] = [ph, pw]
-  } else if (orientation === 'portrait' && pw > ph) {
-    ;[pw, ph] = [ph, pw]
-  }
 
   const sections = findFiles(inputDir, inputDir)
   if (sections.length === 0) {
     throw new Error('No .txt files found in ' + inputDir)
   }
 
-  const doc = new jsPDF({ unit: 'mm', format: [pw, ph] })
-  const usableWidth = pw - margin * 2
-  const usableHeight = ph - margin * 2
+  const doc = new jsPDF({ unit: 'mm', format: [pageWidth, pageHeight], orientation })
+  const usableWidth = doc.internal.pageSize.getWidth() - margin * 2
+  const usableHeight = doc.internal.pageSize.getHeight() - margin * 2
 
   doc.setFontSize(titleFontSize)
   const titleLineHeight = doc.getLineHeight() / doc.internal.scaleFactor
@@ -98,7 +92,7 @@ export function generatePdf(options: PlaceurPdfOptions): void {
     },
   }))
 
-  const result = placeur({ bins: [bin, bin, bin, bin, bin], blocks })
+  const result = placeur({ bins: Array.from({ length: sections.length }, () => bin), blocks })
 
   let pageIndex = 0
   for (const placedBin of result.bins) {
@@ -111,6 +105,12 @@ export function generatePdf(options: PlaceurPdfOptions): void {
 
       const x = margin + pb.x
       const y = margin + pb.y
+
+      if (debug) {
+        doc.setFillColor(245, 245, 245)
+        doc.setDrawColor(200, 200, 200)
+        doc.rect(x, y, pb.width, pb.height, 'DF')
+      }
 
       doc.setFontSize(titleFontSize)
       const titleLines = doc.splitTextToSize(section.title, pb.width)
@@ -128,6 +128,13 @@ export function generatePdf(options: PlaceurPdfOptions): void {
       if (!section) continue
 
       doc.addPage()
+
+      if (debug) {
+        doc.setFillColor(255, 240, 240)
+        doc.setDrawColor(220, 100, 100)
+        doc.rect(margin, margin, usableWidth, usableHeight, 'DF')
+      }
+
       doc.setFontSize(titleFontSize)
       const titleLines = doc.splitTextToSize(section.title, usableWidth)
       doc.text(titleLines, margin, margin + titleLineHeight)
@@ -139,4 +146,5 @@ export function generatePdf(options: PlaceurPdfOptions): void {
   }
 
   doc.save(output)
+  return doc
 }
