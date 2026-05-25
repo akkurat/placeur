@@ -95,11 +95,12 @@ function flowLayout(
   for (const section of sorted) {
     const srcLines = section.content.split('\n')
 
-    // --- span selection: pick the narrowest span whose wrapped lines fit entirely ---
+    // --- span selection: pick narrowest span where no individual line wraps ---
+    // for target 2-word lines → 1col, 5-word → 2col, 10-word → 4col
     const maxSpan = colCount - curCol
     let chosenSpan = 1
     let chosenWrapped: string[][] = []
-    let bestLines = Infinity
+    let prevLines = Infinity  // for fallback when all spans wrap
 
     doc.setFontSize(fontSize)
     for (let span = 1; span <= maxSpan; span++) {
@@ -107,25 +108,20 @@ function flowLayout(
       const w = srcLines.map(line =>
         line.length === 0 ? [''] : doc.splitTextToSize(line, spanWidth),
       )
-      const totalLines = w.reduce((s, a) => s + a.length, 0)
-      const totalHeight = titleHeight + totalLines * bodyLineHeight
-      const spanEnd = curCol + span - 1
-      const maxCursor = Math.max(...colCursors.slice(curCol, spanEnd + 1))
-      const freeSpace = usableHeight - maxCursor
-      if (totalHeight <= freeSpace) {
+      const anyWraps = w.some((lines, i) => srcLines[i] !== '' && lines.length > 1)
+      if (!anyWraps) {
         chosenSpan = span
         chosenWrapped = w
         break
       }
-      // fallback candidate: widest span (fewest lines) if nothing fits entirely
-      if (totalLines < bestLines) {
-        bestLines = totalLines
+      // fallback: track widest span if all spans wrap (paragraphs)
+      const totalLines = w.reduce((s, a) => s + a.length, 0)
+      if (totalLines < prevLines) {
+        prevLines = totalLines
         chosenSpan = span
         chosenWrapped = w
       }
     }
-
-    // fallback: chosenSpan already set to the span with fewest lines
 
     // --- place section at chosenSpan width ---
     const spanWidth = chosenSpan * colWidth + (chosenSpan - 1) * gutter

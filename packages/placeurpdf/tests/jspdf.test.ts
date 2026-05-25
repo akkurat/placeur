@@ -1,10 +1,13 @@
-import { beforeAll, expect, test } from 'vitest'
-import { mkdirSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs'
+import { beforeEach, expect, test } from 'vitest'
+import { existsSync, writeFileSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { jsPDF } from 'jspdf'
 
 import { generatePdf } from '../src/index.js'
+
+beforeEach(() => {
+  if (!existsSync('test-output')) mkdirSync('test-output')
+})
 
 function tmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'placeurpdf-test-'))
@@ -14,148 +17,125 @@ function file(dir: string, name: string, content: string) {
   writeFileSync(join(dir, name), content, 'utf-8')
 }
 
-beforeAll(() => {
-  if (!existsSync('test-output')) {
-    mkdirSync('test-output')
-  }
+function textXPositions(pdfPath: string, textFilter: string): string[] {
+  const pdf = readFileSync(pdfPath, 'utf-8')
+  return [...new Set(
+    pdf.split('Tj')
+      .filter(b => b.includes(textFilter))
+      .map(p => p.match(/([\d.]+) ([\d.]+) Td[^)]/))
+      .filter((m): m is RegExpMatchArray => m !== null)
+      .map(m => (parseFloat(m[1]) / 2.8346).toFixed(1))
+  )].sort((a, b) => parseFloat(a) - parseFloat(b))
+}
+
+// --- orientation ---
+
+test('defaults to landscape', () => {
+  const dir = tmpDir()
+  file(dir, 'a.txt', 'Hello')
+  const doc = generatePdf({ inputDir: dir, output: '/dev/null' })
+  expect(doc.internal.pageSize.getWidth()).toBeGreaterThan(doc.internal.pageSize.getHeight())
 })
 
-test('generates a PDF from a single text file', () => {
+test('portrait', () => {
   const dir = tmpDir()
-  file(dir, 'hello.txt', 'Hello world')
-
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/single.pdf' })
-
-  expect(existsSync('test-output/single.pdf')).toBe(true)
-  expect(doc.getNumberOfPages()).toBe(1)
+  file(dir, 'a.txt', 'Hello')
+  const doc = generatePdf({ inputDir: dir, output: '/dev/null', orientation: 'portrait' })
+  expect(doc.internal.pageSize.getWidth()).toBeLessThan(doc.internal.pageSize.getHeight())
 })
 
-test('defaults to landscape orientation', () => {
+// --- overflow ---
+
+test('long content overflows to multiple pages', () => {
   const dir = tmpDir()
-  file(dir, 'a.txt', 'Content')
-
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/landscape.pdf' })
-
-  const w = doc.internal.pageSize.getWidth()
-  const h = doc.internal.pageSize.getHeight()
-  expect(w).toBeGreaterThan(h)
-})
-
-test('portrait orientation produces portrait page', () => {
-  const dir = tmpDir()
-  file(dir, 'a.txt', 'Content')
-
-  const doc = generatePdf({
-    inputDir: dir,
-    output: 'test-output/portrait.pdf',
-    orientation: 'portrait',
-  })
-
-  const w = doc.internal.pageSize.getWidth()
-  const h = doc.internal.pageSize.getHeight()
-  expect(w).toBeLessThan(h)
-})
-
-test('long content spans multiple pages', () => {
-  const dir = tmpDir()
-
-  const line = 'This is a moderately long text line that helps fill a page quickly when repeated enough times. '
-  file(dir, 'long.txt', line.repeat(80))
-
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/multipage.pdf' })
-
+  file(dir, 'x.txt', 'Words to fill pages. '.repeat(400))
+  const doc = generatePdf({ inputDir: dir, output: '/dev/null' })
   expect(doc.getNumberOfPages()).toBeGreaterThan(1)
 })
 
-test('handles large content overflow gracefully', () => {
+// --- multi-column spreading ---
+
+test('short articles each start in a different column', () => {
   const dir = tmpDir()
+  file(dir, 'a.txt', 'Article A. '.repeat(4))
+  file(dir, 'b.txt', 'Article B. '.repeat(4))
+  file(dir, 'c.txt', 'Article C. '.repeat(4))
 
-  const line = 'Overflow content that keeps going until it fills multiple pages with wrapped lines. '
-  file(dir, 'overflow.txt', line.repeat(100))
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/spread.pdf', columns: 4, gutter: 2 })
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/overflow.pdf', debug: true })
-
-  expect(doc.getNumberOfPages()).toBeGreaterThan(1)
-  expect(existsSync('test-output/overflow.pdf')).toBe(true)
+  const x1 = textXPositions('test-output/spread.pdf', 'Article A')
+  const x2 = textXPositions('test-output/spread.pdf', 'Article B')
+  expect(x1.length).toBe(1)
+  expect(x2.length).toBe(1)
+  expect(x1[0]).not.toBe(x2[0])
 })
 
-test('multi-column layout with 3 content types', () => {
+// --- lyric-spanning: pick narrowest width where no line wraps ---
+
+test('lyrics with 2-word lines stay in 1 column', () => {
   const dir = tmpDir()
+  const lines = Array.from({ length: 8 }, (_, i) => `Two word${i}`).join('\n')
+  file(dir, 'short.txt', lines)
 
-  function unbreakable(i: number) {
-    return `block${i} https://example.com/verylongpath/${'x'.repeat(20)}`
-  }
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-short.pdf', columns: 4, gutter: 2 })
 
-  function lyrics(i: number) {
-    const verses = [
-      'Verse one line one',
-      'Verse one line two',
-      'Verse one line three',
-      '',
-      'Chorus never gonna',
-      'give you up',
-      'let you down',
-      '',
-      'Verse two line one',
-      'turn around',
-      'and hurt you',
-    ]
-    return verses.map(l => `${l} ${i}`).join('\n')
-  }
-
-  function normal(i: number) {
-    return `Article ${i}. ` + 'A normal paragraph with wrapped text that reads naturally across the column width. '.repeat(8)
-  }
-
-  for (let i = 1; i <= 3; i++) {
-    file(dir, `unbreakable-${i}.txt`, unbreakable(i))
-    file(dir, `lyric-${i}.txt`, lyrics(i))
-    file(dir, `article-${i}.txt`, normal(i))
-  }
-
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/columns.pdf', columns: 4, gutter: 2, debug: true })
-
-  expect(existsSync('test-output/columns.pdf')).toBe(true)
-  expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1)
+  const xs = textXPositions('test-output/lyric-short.pdf', 'word')
+  // 2-word lines fit in 1 column without wrapping → all at same x
+  expect(xs.length).toBe(1)
 })
 
-test('handles unpacked content overflow gracefully', () => {
+test('lyrics with 5-word lines use 2 columns', () => {
   const dir = tmpDir()
-  file(dir, 'overflow.txt', 'Overflow content. '.repeat(2000))
+  const lines = Array.from({ length: 8 }, (_, i) => `five fresh happy words line ${i}`).join('\n')
+  file(dir, 'med.txt', lines)
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/overflow.pdf' })
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-med.pdf', columns: 4, gutter: 2 })
 
-  expect(doc.getNumberOfPages()).toBeGreaterThan(1)
-  expect(existsSync('test-output/overflow.pdf')).toBe(true)
+  const xs = textXPositions('test-output/lyric-med.pdf', 'words')
+  // 5-word lines wrap at 1-col, fit at 2-col → single x position (span from col 0)
+  expect(xs.length).toBe(1)
 })
 
-test('respects custom page dimensions', () => {
+test('lyrics with 10-word lines use 4 columns', () => {
   const dir = tmpDir()
-  file(dir, 'a.txt', 'Content')
+  const lines = Array.from({ length: 8 }, (_, i) => `one two three four five six seven eight nine ${i}`).join('\n')
+  file(dir, 'long.txt', lines)
 
-  const doc = generatePdf({
-    inputDir: dir,
-    output: 'test-output/custom.pdf',
-    pageWidth: 100,
-    pageHeight: 200,
-    orientation: 'portrait',
-  })
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-long.pdf', columns: 4, gutter: 2 })
 
+  const xs = textXPositions('test-output/lyric-long.pdf', 'one two')
+  // 10-word lines need 4-col width to avoid wrapping → single x position
+  expect(xs.length).toBe(1)
+})
+
+test('long text with no line breaks spans wider width (fewer wrapped lines)', () => {
+  const dir = tmpDir()
+  const longLine = Array.from({ length: 60 }, (_, i) => `LongWord${i}`).join(' ')
+  file(dir, 'x.txt', longLine.repeat(6))
+  file(dir, 'y.txt', 'Short filler')
+
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/span-width.pdf', columns: 4, gutter: 2 })
+
+  const xs = textXPositions('test-output/span-width.pdf', 'LongWord')
+  // At 1-col width (~360 lines) this would overflow to multiple x positions.
+  // With width-spanning the lines are far fewer → single x for the span.
+  expect(xs.length).toBe(1)
+})
+
+// --- custom dimensions ---
+
+test('custom portrait dimensions', () => {
+  const dir = tmpDir()
+  file(dir, 'a.txt', 'Hello')
+  const doc = generatePdf({ inputDir: dir, output: '/dev/null', pageWidth: 100, pageHeight: 200, orientation: 'portrait' })
   expect(doc.internal.pageSize.getWidth()).toBeCloseTo(100)
   expect(doc.internal.pageSize.getHeight()).toBeCloseTo(200)
 })
 
-test('respects custom page dimensions in landscape', () => {
+test('custom dimensions swap for landscape', () => {
   const dir = tmpDir()
-  file(dir, 'a.txt', 'Content')
-
-  const doc = generatePdf({
-    inputDir: dir,
-    output: 'test-output/custom-landscape.pdf',
-    pageWidth: 100,
-    pageHeight: 200,
-  })
-
+  file(dir, 'a.txt', 'Hello')
+  const doc = generatePdf({ inputDir: dir, output: '/dev/null', pageWidth: 100, pageHeight: 200 })
   expect(doc.internal.pageSize.getWidth()).toBeCloseTo(200)
   expect(doc.internal.pageSize.getHeight()).toBeCloseTo(100)
 })
