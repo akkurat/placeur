@@ -1,23 +1,13 @@
-# tsdown-starter
+# placeur monorepo
 
-A starter for creating a TypeScript package.
+- **placeur** – Placing algorithm for (text) boxes
+- **placeurpdf** – CLI tool to generate PDFs from text files using placeur layout
 
 ## Development
 
-- Install dependencies:
-
 ```bash
 npm install
-```
-
-- Run the unit tests:
-
-```bash
-npm run test
-```
-
-- Build the library:
-
-```bash
-npm run build
+npm run build -w packages/placeur
+npm run test -w packages/placeur
+npm run test -w packages/placeurpdf
 ```

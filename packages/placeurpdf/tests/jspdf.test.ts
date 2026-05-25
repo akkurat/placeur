@@ -2,8 +2,7 @@ import { beforeAll, expect, test } from 'vitest'
 import { jsPDF } from 'jspdf'
 import { existsSync, mkdirSync } from 'node:fs'
 
-import { type Bin, type Block } from '../src/api-types.js'
-import {placeur} from '../src/placeur.js'
+import { placeur, type Bin, type Block } from 'placeur'
 
 function makeMeasureText(text: string, fontSize: number) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -40,7 +39,6 @@ test('heightForWidth returns correct measured height', () => {
 })
 
 test('places jspdf-measured blocks into columns', () => {
-  // bin height just fits one block per column to force spillover
   const bin: Bin = {
     width: 210,
     height: 10,
@@ -106,11 +104,9 @@ test('short blocks all stack in first column', () => {
 
   expect(result.bins).toHaveLength(1)
   expect(result.bins[0].blocks).toHaveLength(3)
-  // all in column 0 because they're short
   for (const pb of result.bins[0].blocks) {
     expect(pb.x).toBe(0)
   }
-  // stacked vertically
   expect(result.bins[0].blocks[0].y).toBe(0)
   expect(result.bins[0].blocks[1].y).toBeGreaterThan(0)
   expect(result.bins[0].blocks[2].y).toBeGreaterThan(
@@ -256,7 +252,6 @@ test('generates A4 page with realistic newspaper-style columns', () => {
       Temperatures have soared to 45°C in some regions, prompting health
       officials to issue emergency guidelines. The heatwave is expected
       to persist for another week.
-      
       `,
     },
     {
@@ -289,7 +284,6 @@ test('generates A4 page with realistic newspaper-style columns', () => {
   for (let i = 0; i < result.bins.length; i++) {
     if (i > 0) pdf.addPage()
     const placed = result.bins[i].blocks
-
 
     for (const pb of placed) {
       const article = articles.find((a) => a.id === pb.block.id)
