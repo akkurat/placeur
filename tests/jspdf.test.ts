@@ -2,7 +2,8 @@ import { beforeAll, expect, test } from 'vitest'
 import { jsPDF } from 'jspdf'
 import { existsSync, mkdirSync } from 'node:fs'
 
-import { placeur, type Bin, type Block } from '../src'
+import { type Bin, type Block } from '../src/api-types.js'
+import {placeur} from '../src/placeur.js'
 
 function makeMeasureText(text: string, fontSize: number) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
