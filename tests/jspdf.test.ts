@@ -1,5 +1,7 @@
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import { jsPDF } from 'jspdf'
+import { existsSync, mkdirSync } from 'node:fs'
+
 import { placeur, type Bin, type Block } from '../src'
 
 function makeMeasureText(text: string, fontSize: number) {
@@ -12,6 +14,12 @@ function makeMeasureText(text: string, fontSize: number) {
     return lines.length * lineH
   }
 }
+
+beforeAll(()=> {
+  if(!existsSync('test-output') ) {
+    mkdirSync('test-output')
+  }
+})
 
 test('heightForWidth returns correct measured height', () => {
   const text = 'Hello world'
