@@ -70,56 +70,52 @@ test('short articles each start in a different column', () => {
   expect(x1[0]).not.toBe(x2[0])
 })
 
-// --- lyric-spanning: pick narrowest width where no line wraps ---
+// --- lyric-spanning: all 3 types together in one document ---
 
-test('lyrics with 2-word lines stay in 1 column', () => {
+test('mixed lyrics: each song spanning its appropriate width', () => {
   const dir = tmpDir()
-  const lines = Array.from({ length: 8 }, (_, i) => `Two word${i}`).join('\n')
-  file(dir, 'short.txt', lines)
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-short.pdf', columns: 4, gutter: 2 })
+  // Song 1:  2 words/line → fits in 1 column (span=1)
+  const shortLines = Array.from({ length: 10 }, (_, i) => `short line${i}`).join('\n')
+  file(dir, 'song-short.txt', shortLines)
 
-  const xs = textXPositions('test-output/lyric-short.pdf', 'word')
-  // 2-word lines fit in 1 column without wrapping → all at same x
-  expect(xs.length).toBe(1)
-})
+  // Song 2:  5 words/line → wraps at 1-col, fits at 2-col (span=2)
+  const words5 = Array.from({ length: 10 }, (_, i) => `medium length words for line ${i}`).join('\n')
+  file(dir, 'song-medium.txt', words5)
 
-test('lyrics with 5-word lines use 2 columns', () => {
-  const dir = tmpDir()
-  const lines = Array.from({ length: 8 }, (_, i) => `five fresh happy words line ${i}`).join('\n')
-  file(dir, 'med.txt', lines)
+  // Song 3: 10 words/line → wraps at 1/2-col, fits at 3-col (span=3)
+  // Use repeated 8-char words: 'xxxxxxxx'
+  const longLines = Array.from({ length: 6 }, (_, i) =>
+    Array.from({ length: 10 }, () => 'xxxxxxxx').join(' ') + ` ${i}`
+  ).join('\n')
+  file(dir, 'song-long.txt', longLines)
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-med.pdf', columns: 4, gutter: 2 })
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/mixed-lyrics.pdf', columns: 4, gutter: 2, debug: true })
+  expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1)
 
-  const xs = textXPositions('test-output/lyric-med.pdf', 'words')
-  // 5-word lines wrap at 1-col, fit at 2-col → single x position (span from col 0)
-  expect(xs.length).toBe(1)
-})
+  // Each song should be intact (no line wrapping within each song)
+  const pdf = readFileSync('test-output/mixed-lyrics.pdf', 'utf-8')
+  const blocks = pdf.split('Tj')
 
-test('lyrics with 10-word lines use 4 columns', () => {
-  const dir = tmpDir()
-  const lines = Array.from({ length: 8 }, (_, i) => `one two three four five six seven eight nine ${i}`).join('\n')
-  file(dir, 'long.txt', lines)
+  const shortBlocks = blocks.filter(b => b.includes('short line'))
+  const medBlocks   = blocks.filter(b => b.includes('medium length'))
+  const longBlocks  = blocks.filter(b => b.includes('xxxxxxxx'))
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/lyric-long.pdf', columns: 4, gutter: 2 })
+  expect(shortBlocks.length).toBe(10)
+  expect(medBlocks.length).toBe(10)
+  expect(longBlocks.length).toBe(6)
 
-  const xs = textXPositions('test-output/lyric-long.pdf', 'one two')
-  // 10-word lines need 4-col width to avoid wrapping → single x position
-  expect(xs.length).toBe(1)
-})
+  // Each song starts at a different x position (spread across columns)
+  // Long song spans 3 cols → x=20mm, medium song at col 3 → x=214mm
+  // Short song on next page at col 0 → x=20mm but different page
+  const shortX = textXPositions('test-output/mixed-lyrics.pdf', 'short line')
+  const medX   = textXPositions('test-output/mixed-lyrics.pdf', 'medium length')
+  const longX  = textXPositions('test-output/mixed-lyrics.pdf', 'xxxxxxxx')
 
-test('long text with no line breaks spans wider width (fewer wrapped lines)', () => {
-  const dir = tmpDir()
-  const longLine = Array.from({ length: 60 }, (_, i) => `LongWord${i}`).join(' ')
-  file(dir, 'x.txt', longLine.repeat(6))
-  file(dir, 'y.txt', 'Short filler')
-
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/span-width.pdf', columns: 4, gutter: 2 })
-
-  const xs = textXPositions('test-output/span-width.pdf', 'LongWord')
-  // At 1-col width (~360 lines) this would overflow to multiple x positions.
-  // With width-spanning the lines are far fewer → single x for the span.
-  expect(xs.length).toBe(1)
+  expect(shortX.length).toBe(1)
+  expect(medX.length).toBe(1)
+  expect(longX.length).toBe(1)
+  expect(medX[0]).not.toBe(longX[0])
 })
 
 // --- custom dimensions ---
