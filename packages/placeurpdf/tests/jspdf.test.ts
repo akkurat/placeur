@@ -58,28 +58,62 @@ test('portrait orientation produces portrait page', () => {
 
 test('long content spans multiple pages', () => {
   const dir = tmpDir()
-  file(dir, 'long.txt', 'A long text block. '.repeat(800))
+
+  const line = 'This is a moderately long text line that helps fill a page quickly when repeated enough times. '
+  file(dir, 'long.txt', line.repeat(80))
 
   const doc = generatePdf({ inputDir: dir, output: 'test-output/multipage.pdf' })
 
   expect(doc.getNumberOfPages()).toBeGreaterThan(1)
 })
 
-test('multi-column layout with multiple files', () => {
+test('handles large content overflow gracefully', () => {
   const dir = tmpDir()
 
-  const long = (i: number) =>
-    `Article ${i}. This is a longer paragraph that fills multiple lines ` +
-    `of text spanning the column width. `.repeat(20)
+  const line = 'Overflow content that keeps going until it fills multiple pages with wrapped lines. '
+  file(dir, 'overflow.txt', line.repeat(100))
 
-  const short = (i: number) => `Short note ${i}. Just a brief line.`
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/overflow.pdf', debug: true })
 
-  for (let i = 1; i <= 30; i++) {
-    const content = i % 5 === 0 ? short(i) : long(i)
-    file(dir, `article-${i}.txt`, content)
+  expect(doc.getNumberOfPages()).toBeGreaterThan(1)
+  expect(existsSync('test-output/overflow.pdf')).toBe(true)
+})
+
+test('multi-column layout with 3 content types', () => {
+  const dir = tmpDir()
+
+  function unbreakable(i: number) {
+    return `block${i} https://example.com/verylongpath/${'x'.repeat(20)}`
   }
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/columns.pdf', columns: 7, gutter: 8, debug: true })
+  function lyrics(i: number) {
+    const verses = [
+      'Verse one line one',
+      'Verse one line two',
+      'Verse one line three',
+      '',
+      'Chorus never gonna',
+      'give you up',
+      'let you down',
+      '',
+      'Verse two line one',
+      'turn around',
+      'and hurt you',
+    ]
+    return verses.map(l => `${l} ${i}`).join('\n')
+  }
+
+  function normal(i: number) {
+    return `Article ${i}. ` + 'A normal paragraph with wrapped text that reads naturally across the column width. '.repeat(8)
+  }
+
+  for (let i = 1; i <= 3; i++) {
+    file(dir, `unbreakable-${i}.txt`, unbreakable(i))
+    file(dir, `lyric-${i}.txt`, lyrics(i))
+    file(dir, `article-${i}.txt`, normal(i))
+  }
+
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/columns.pdf', columns: 4, gutter: 2, debug: true })
 
   expect(existsSync('test-output/columns.pdf')).toBe(true)
   expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1)
