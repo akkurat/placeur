@@ -79,10 +79,11 @@ test('places jspdf-measured blocks into columns', () => {
 
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
   pdf.setFontSize(12)
+  pdf.setFillColor(240, 240, 240)
   pdf.setDrawColor(200, 200, 200)
 
   for (const pb of result.bins[0].blocks) {
-    pdf.rect(pb.x, pb.y, pb.width, pb.height)
+    pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
   }
 
   pdf.save('test-output/jspdf-columns.pdf')
@@ -121,16 +122,17 @@ test('places long text across multiple A4 pages', () => {
   const bin: Bin = {
     width: 210,
     height: 297,
-    columns: { count: 1, gutter: 0 },
+    columns: { count: 2, gutter: 8 },
   }
+  const shortBin: Bin = { ...bin, height: 10 }
 
   const blocks: Block[] = [
     { id: 'short', heightForWidth: makeMeasureText('Short text.', 12) },
     {
       id: 'long',
       heightForWidth: makeMeasureText(
-        'A long text block. '.repeat(60) +
-          'This exceeds one page so it wraps to a second bin.',
+        'A long text block. '.repeat(80) +
+          'This wraps to a second page.',
         12,
       ),
     },
@@ -138,24 +140,24 @@ test('places long text across multiple A4 pages', () => {
   ]
 
   const result = placeur({
-    bins: [bin, { ...bin }],
+    bins: [shortBin, bin],
     blocks,
   })
 
-  expect(result.bins.length).toBeGreaterThanOrEqual(1)
+  expect(result.bins).toHaveLength(2)
   expect(result.unpacked).toHaveLength(0)
 
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
 
   for (let i = 0; i < result.bins.length; i++) {
     if (i > 0) pdf.addPage()
-    const placed = result.bins[i].blocks
 
     pdf.setFontSize(12)
+    pdf.setFillColor(240, 240, 240)
     pdf.setDrawColor(200, 200, 200)
 
-    for (const pb of placed) {
-      pdf.rect(pb.x, pb.y, pb.width, pb.height)
+    for (const pb of result.bins[i].blocks) {
+      pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
     }
   }
 
@@ -244,6 +246,7 @@ test('generates A4 page with realistic newspaper-style columns', () => {
     if (i > 0) pdf.addPage()
     const placed = result.bins[i].blocks
 
+    pdf.setFillColor(245, 245, 245)
     pdf.setDrawColor(220, 220, 220)
 
     for (const pb of placed) {
@@ -252,7 +255,7 @@ test('generates A4 page with realistic newspaper-style columns', () => {
         const lines = pdf.splitTextToSize(article.text, pb.width - 4)
         pdf.text(lines, pb.x + 2, pb.y + 4)
       }
-      pdf.rect(pb.x, pb.y, pb.width, pb.height)
+      pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
     }
   }
 
