@@ -8,11 +8,11 @@ import {placeur} from '../src/placeur.js'
 function makeMeasureText(text: string, fontSize: number) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   doc.setFontSize(fontSize)
-  const lineH = doc.getTextDimensions('M').h
+  const lineHeight = doc.getLineHeight() / doc.internal.scaleFactor
 
   return (width: number): number => {
     const lines = doc.splitTextToSize(text, width)
-    return lines.length * lineH
+    return lines.length * lineHeight
   }
 }
 
@@ -27,9 +27,9 @@ test('heightForWidth returns correct measured height', () => {
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   doc.setFontSize(12)
-  const lineH = doc.getTextDimensions('M').h
+  const lineHeight = doc.getLineHeight() / doc.internal.scaleFactor
   const lines = doc.splitTextToSize(text, 100)
-  const expectedHeight = lines.length * lineH
+  const expectedHeight = lines.length * lineHeight
 
   const block: Block = {
     id: 'measure',
@@ -293,8 +293,8 @@ test('generates A4 page with realistic newspaper-style columns', () => {
 
     for (const pb of placed) {
       const article = articles.find((a) => a.id === pb.block.id)
-    pdf.setDrawColor(220, 220, 220)
-    pdf.setFillColor(245, 245, 245)
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setFillColor(245, 245, 245)
       pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
       if (article) {
         const lines = pdf.splitTextToSize(article.text, pb.width - 4)
