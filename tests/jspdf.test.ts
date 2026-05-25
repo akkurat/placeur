@@ -199,11 +199,38 @@ test('generates A4 page with realistic newspaper-style columns', () => {
       id: 'sports',
       text: `Sports: Underdog Team Wins Championship.
 
-      In a stunning upset, the underdog team clinched the championship
-      title last night with a last-minute goal that sent the crowd into
-      a frenzy. The team, which was ranked last at the beginning of the
-      season, overcame incredible odds to secure their victory. We never
-      gave up hope, said the captain. This is a dream come true.`,
+      This
+      Are 
+      None
+      Very Short
+      Very Very
+      Short
+      Lines
+      no point
+      in making
+      more
+      than 
+      1 
+      column
+      no
+      no 
+      very no
+      no
+      Very Short
+      Very Very
+      Short
+      Lines
+      no point
+      in making
+      more
+      than 
+      1 
+      column
+      no
+      no 
+      very no
+      no
+`,
     },
     {
       id: 'weather',
@@ -213,7 +240,24 @@ test('generates A4 page with realistic newspaper-style columns', () => {
       heatwave continues to break temperature records across the continent.
       Temperatures have soared to 45°C in some regions, prompting health
       officials to issue emergency guidelines. The heatwave is expected
-      to persist for another week.`,
+      to persist for another week.
+      Meteorologists are warning residents to stay hydrated as an unusual
+      heatwave continues to break temperature records across the continent.
+      Temperatures have soared to 45°C in some regions, prompting health
+      officials to issue emergency guidelines. The heatwave is expected
+      to persist for another week.
+      Meteorologists are warning residents to stay hydrated as an unusual
+      heatwave continues to break temperature records across the continent.
+      Temperatures have soared to 45°C in some regions, prompting health
+      officials to issue emergency guidelines. The heatwave is expected
+      to persist for another week.
+      Meteorologists are warning residents to stay hydrated as an unusual
+      heatwave continues to break temperature records across the continent.
+      Temperatures have soared to 45°C in some regions, prompting health
+      officials to issue emergency guidelines. The heatwave is expected
+      to persist for another week.
+      
+      `,
     },
     {
       id: 'business',
@@ -246,16 +290,16 @@ test('generates A4 page with realistic newspaper-style columns', () => {
     if (i > 0) pdf.addPage()
     const placed = result.bins[i].blocks
 
-    pdf.setFillColor(245, 245, 245)
-    pdf.setDrawColor(220, 220, 220)
 
     for (const pb of placed) {
       const article = articles.find((a) => a.id === pb.block.id)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.setFillColor(245, 245, 245)
+      pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
       if (article) {
         const lines = pdf.splitTextToSize(article.text, pb.width - 4)
         pdf.text(lines, pb.x + 2, pb.y + 4)
       }
-      pdf.rect(pb.x, pb.y, pb.width, pb.height, 'DF')
     }
   }
 
