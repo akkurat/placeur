@@ -70,52 +70,53 @@ test('short articles each start in a different column', () => {
   expect(x1[0]).not.toBe(x2[0])
 })
 
-// --- lyric-spanning: all 3 types together in one document ---
+// --- lyric-spanning: all 3 types together in one document, one page ---
 
 test('mixed lyrics: each song spanning its appropriate width', () => {
   const dir = tmpDir()
 
-  // Song 1:  2 words/line → fits in 1 column (span=1)
-  const shortLines = Array.from({ length: 10 }, (_, i) => `short line${i}`).join('\n')
-  file(dir, 'song-short.txt', shortLines)
+  // Song 1:  2 words×3chars/line → fits in 1 column (span=1)
+  const shortLines = Array.from({ length: 6 }, (_, i) => `xx xx ${i}`).join('\n')
+  file(dir, 'sht.txt', shortLines)
+  file(dir, 'sht1.txt', shortLines)
+  file(dir, 'sht2.txt', shortLines)
 
-  // Song 2:  5 words/line → wraps at 1-col, fits at 2-col (span=2)
-  const words5 = Array.from({ length: 10 }, (_, i) => `medium length words for line ${i}`).join('\n')
-  file(dir, 'song-medium.txt', words5)
-
-  // Song 3: 10 words/line → wraps at 1/2-col, fits at 3-col (span=3)
-  // Use repeated 8-char words: 'xxxxxxxx'
-  const longLines = Array.from({ length: 6 }, (_, i) =>
-    Array.from({ length: 10 }, () => 'xxxxxxxx').join(' ') + ` ${i}`
+  // Song 2:  5 words×6chars/line → wraps at 1-col, fits at 2-col (span=2)
+  const medLines = Array.from({ length: 6 }, (_, i) =>
+    Array.from({ length: 5 }, () => 'bbbbbb').join(' ') + ` ${i}`
   ).join('\n')
-  file(dir, 'song-long.txt', longLines)
+  file(dir, 'med.txt', medLines)
+  file(dir, 'med1.txt', medLines)
 
-  const doc = generatePdf({ inputDir: dir, output: 'test-output/mixed-lyrics.pdf', columns: 4, gutter: 2, debug: true })
-  expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1)
+  // Song 3: 10 words×5chars/line → needs span=4 to avoid wrapping
+  const longLines = Array.from({ length: 6 }, (_, i) =>
+    Array.from({ length: 10 }, () => 'ccccc').join(' ') + ` ${i}`
+  ).join('\n')
+  file(dir, 'lng.txt', longLines)
+  file(dir, 'lng2.txt', longLines)
+  file(dir, 'lng3.txt', longLines)
 
-  // Each song should be intact (no line wrapping within each song)
+  // 7 columns → 2×3 span=1 + 5×6 span=2 + 10×5 span=4 = 7 columns used, all on 1 page
+  const doc = generatePdf({ inputDir: dir, output: 'test-output/mixed-lyrics.pdf', columns: 7, gutter: 2, debug: true })
+  expect(doc.getNumberOfPages()).toBe(1)
+
+  // Each song intact (no line wrapping within each song)
   const pdf = readFileSync('test-output/mixed-lyrics.pdf', 'utf-8')
   const blocks = pdf.split('Tj')
 
-  const shortBlocks = blocks.filter(b => b.includes('short line'))
-  const medBlocks   = blocks.filter(b => b.includes('medium length'))
-  const longBlocks  = blocks.filter(b => b.includes('xxxxxxxx'))
+  expect(blocks.filter(b => b.includes('xx xx')).length).toBe(6)
+  expect(blocks.filter(b => b.includes('bbbbbb')).length).toBe(6)
+  expect(blocks.filter(b => b.includes('ccccc')).length).toBe(6)
 
-  expect(shortBlocks.length).toBe(10)
-  expect(medBlocks.length).toBe(10)
-  expect(longBlocks.length).toBe(6)
-
-  // Each song starts at a different x position (spread across columns)
-  // Long song spans 3 cols → x=20mm, medium song at col 3 → x=214mm
-  // Short song on next page at col 0 → x=20mm but different page
-  const shortX = textXPositions('test-output/mixed-lyrics.pdf', 'short line')
-  const medX   = textXPositions('test-output/mixed-lyrics.pdf', 'medium length')
-  const longX  = textXPositions('test-output/mixed-lyrics.pdf', 'xxxxxxxx')
-
-  expect(shortX.length).toBe(1)
-  expect(medX.length).toBe(1)
-  expect(longX.length).toBe(1)
-  expect(medX[0]).not.toBe(longX[0])
+  // Each song at a different x position
+  const xs = textXPositions('test-output/mixed-lyrics.pdf', 'xx xx')
+  const xm = textXPositions('test-output/mixed-lyrics.pdf', 'bbbbbb')
+  const xl = textXPositions('test-output/mixed-lyrics.pdf', 'ccccc')
+  expect(xs.length).toBe(1)
+  expect(xm.length).toBe(1)
+  expect(xl.length).toBe(1)
+  expect(xs[0]).not.toBe(xm[0])
+  expect(xm[0]).not.toBe(xl[0])
 })
 
 // --- custom dimensions ---
