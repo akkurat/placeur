@@ -1,11 +1,7 @@
-import { readdirSync, readFileSync, type Dirent } from 'node:fs'
-import { join, relative } from 'node:path'
+import { flowLayout } from 'placeur'
 import { jsPDF } from 'jspdf'
-
-export interface Section {
-  title: string
-  content: string
-}
+import { findFiles } from './io.js'
+import { sectionsToBlocks, type BlockMeta } from './layout.js'
 
 export type Orientation = 'portrait' | 'landscape'
 
@@ -23,212 +19,49 @@ export interface PlaceurPdfOptions {
   debug?: boolean
 }
 
-interface FlowItem {
-  x: number
-  y: number
-  width: number
-  height: number
-  title: string | null
-  bodyLines: string[]
-}
+export { findFiles } from './io.js'
+export type { Section } from './io.js'
 
-function findFiles(dir: string, baseDir: string): Section[] {
-  const sections: Section[] = []
-    const entries = readdirSync(dir, { withFileTypes: true }).sort((a: Dirent, b: Dirent) =>
-    a.name.localeCompare(b.name)
-  )
-  for (const entry of entries) {
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      sections.push(...findFiles(full, baseDir))
-    } else if (entry.isFile() && entry.name.endsWith('.txt')) {
-      const rel = relative(baseDir, full)
-      const title = rel.replace(/\.txt$/i, '')
-      const content = readFileSync(full, 'utf-8')
-      sections.push({ title, content })
-    }
-  }
-  return sections
-}
-
-function flowLayout(
-  sections: Section[],
-  usableWidth: number,
-  usableHeight: number,
-  columns: number,
-  gutter: number,
+function renderPage(
   doc: jsPDF,
-  fontSize: number,
+  page: readonly { block: { id: string }; x: number; y: number; width: number; height: number }[],
+  meta: Map<string, BlockMeta>,
+  margin: number,
   titleFontSize: number,
-): FlowItem[][] {
-  const colCount = columns || 1
-  const colWidth = colCount > 1
-    ? (usableWidth - gutter * (colCount - 1)) / colCount
-    : usableWidth
-
+  fontSize: number,
+  debug: boolean,
+) {
   doc.setFontSize(titleFontSize)
   const titleLineHeight = doc.getLineHeight() / doc.internal.scaleFactor
-  const titleHeight = titleLineHeight + 4
+  const titlePad = 4
 
   doc.setFontSize(fontSize)
   const bodyLineHeight = doc.getLineHeight() / doc.internal.scaleFactor
 
-  const pages: FlowItem[][] = [[]]
-  let colCursors = new Array(colCount).fill(0)
-  let curCol = 0
+  for (const pb of page) {
+    const d = meta.get(pb.block.id)
+    if (!d) continue
 
-  function advanceCol() {
-    curCol++
-    if (curCol >= colCount) {
-      pages.push([])
-      colCursors = new Array(colCount).fill(0)
-      curCol = 0
+    const x = margin + pb.x
+    const y = margin + pb.y
+
+    if (debug) {
+      doc.setFillColor(245, 245, 245)
+      doc.setDrawColor(200, 200, 200)
+      doc.rect(x, y, pb.width, pb.height, 'DF')
+    }
+
+    if (d.title !== null) {
+      doc.setFontSize(titleFontSize)
+      const titleLines = doc.splitTextToSize(d.title, pb.width)
+      doc.text(titleLines, x, y + titleLineHeight)
+      doc.setFontSize(fontSize)
+      doc.text(d.lines, x, y + titleLineHeight + titlePad + bodyLineHeight)
+    } else {
+      doc.setFontSize(fontSize)
+      doc.text(d.lines, x, y + bodyLineHeight)
     }
   }
-
-  function columnFree(): number {
-    return usableHeight - colCursors[curCol]
-  }
-
-  const sorted = [...sections].sort((a, b) => b.content.length - a.content.length)
-
-  for (const section of sorted) {
-    const srcLines = section.content.split('\n')
-
-    // --- span selection: pick narrowest span where no individual line wraps ---
-    // for target 2-word lines → 1col, 5-word → 2col, 10-word → 4col
-    const maxSpan = colCount - curCol
-    let chosenSpan = 1
-    let chosenWrapped: string[][] = []
-    let prevLines = Infinity  // for fallback when all spans wrap
-
-    doc.setFontSize(fontSize)
-    for (let span = 1; span <= maxSpan; span++) {
-      const spanWidth = span * colWidth + (span - 1) * gutter
-      const w = srcLines.map(line =>
-        line.length === 0 ? [''] : doc.splitTextToSize(line, spanWidth),
-      )
-      const anyWraps = w.some((lines, i) => srcLines[i] !== '' && lines.length > 1)
-      if (!anyWraps) {
-        chosenSpan = span
-        chosenWrapped = w
-        break
-      }
-      // fallback: track widest span if all spans wrap (paragraphs)
-      const totalLines = w.reduce((s, a) => s + a.length, 0)
-      if (totalLines < prevLines) {
-        prevLines = totalLines
-        chosenSpan = span
-        chosenWrapped = w
-      }
-    }
-
-    // --- place section at chosenSpan width ---
-    const spanWidth = chosenSpan * colWidth + (chosenSpan - 1) * gutter
-    const wrapped = chosenWrapped
-    const spanEnd = curCol + chosenSpan - 1
-
-    let lineIdx = 0
-    let placedTitle = false
-
-    while (lineIdx < wrapped.length || !placedTitle) {
-      if (!placedTitle) {
-        const firstBody = wrapped.length > 0 ? wrapped[0] : []
-        const minKeep = titleHeight + bodyLineHeight
-
-        if (minKeep > columnFree()) {
-          advanceCol()
-          continue
-        }
-
-        const maxBody = Math.floor((columnFree() - titleHeight) / bodyLineHeight)
-        const renderBody = maxBody > 0 && firstBody.length > 0 ? firstBody.slice(0, maxBody) : []
-        const bh = renderBody.length * bodyLineHeight
-
-        const x = curCol * (colWidth + gutter)
-        pages[pages.length - 1].push({
-          x, y: colCursors[curCol], width: spanWidth, height: titleHeight + bh,
-          title: section.title,
-          bodyLines: renderBody,
-        })
-        // update all spanned columns' cursors
-        const cursorVal = colCursors[curCol] + titleHeight + bh
-        for (let c = curCol; c <= spanEnd && c < colCount; c++) {
-          colCursors[c] = cursorVal
-        }
-        placedTitle = true
-
-        if (renderBody.length < firstBody.length) {
-          lineIdx = 0
-          wrapped[0] = firstBody.slice(maxBody)
-        } else {
-          lineIdx = 1
-        }
-
-        if (lineIdx >= wrapped.length && renderBody.length === 0) {
-          break
-        }
-      } else {
-        while (lineIdx < wrapped.length) {
-          const bl = wrapped[lineIdx]
-          const bh = bl.length * bodyLineHeight
-
-          if (bh > columnFree()) {
-            if (bh > usableHeight) {
-              if (columnFree() < bodyLineHeight) {
-                advanceCol()
-              }
-              const maxLines = Math.max(1, Math.floor(columnFree() / bodyLineHeight))
-              const renderBl = bl.slice(0, maxLines)
-              const remainingBl = bl.slice(maxLines)
-              if (remainingBl.length === 0) {
-                lineIdx++
-              } else {
-                wrapped[lineIdx] = remainingBl
-              }
-              const rx = curCol * (colWidth + gutter)
-              const cursorVal = colCursors[curCol] + maxLines * bodyLineHeight
-              pages[pages.length - 1].push({
-                x: rx, y: colCursors[curCol], width: spanWidth, height: maxLines * bodyLineHeight,
-                title: null,
-                bodyLines: renderBl,
-              })
-              for (let c = curCol; c <= spanEnd && c < colCount; c++) {
-                colCursors[c] = cursorVal
-              }
-            }
-            advanceCol()
-            break
-          }
-
-          const x = curCol * (colWidth + gutter)
-          const cursorVal = colCursors[curCol] + bh
-          pages[pages.length - 1].push({
-            x, y: colCursors[curCol], width: spanWidth, height: bh,
-            title: null,
-            bodyLines: bl,
-          })
-          for (let c = curCol; c <= spanEnd && c < colCount; c++) {
-            colCursors[c] = cursorVal
-          }
-          lineIdx++
-        }
-      }
-    }
-
-    // advance past the spanned columns
-    const si = sorted.indexOf(section)
-    if (colCount > 1 && si < sorted.length - 1) {
-      curCol += chosenSpan
-      if (curCol >= colCount) {
-        pages.push([])
-        colCursors = new Array(colCount).fill(0)
-        curCol = 0
-      }
-    }
-  }
-
-  return pages
 }
 
 export function generatePdf(options: PlaceurPdfOptions): jsPDF {
@@ -255,38 +88,21 @@ export function generatePdf(options: PlaceurPdfOptions): jsPDF {
   const usableWidth = doc.internal.pageSize.getWidth() - margin * 2
   const usableHeight = doc.internal.pageSize.getHeight() - margin * 2
 
-  const pages = flowLayout(sections, usableWidth, usableHeight, columns, gutter, doc, fontSize, titleFontSize)
+  const colWidth = columns > 1
+    ? (usableWidth - gutter * (columns - 1)) / columns
+    : usableWidth
 
-  doc.setFontSize(titleFontSize)
-  const titleLineHeight = doc.getLineHeight() / doc.internal.scaleFactor
+  const { blocks, meta } = sectionsToBlocks(
+    sections, doc, columns, colWidth, gutter, usableHeight,
+    fontSize, titleFontSize,
+  )
 
-  doc.setFontSize(fontSize)
-  const bodyLineHeight = doc.getLineHeight() / doc.internal.scaleFactor
+  const bin = { width: usableWidth, height: usableHeight, columns: { count: columns, gutter } }
+  const result = flowLayout(bin, blocks)
 
-  for (let pi = 0; pi < pages.length; pi++) {
+  for (let pi = 0; pi < result.pages.length; pi++) {
     if (pi > 0) doc.addPage()
-
-    for (const item of pages[pi]) {
-      const x = margin + item.x
-      const y = margin + item.y
-
-      if (debug) {
-        doc.setFillColor(245, 245, 245)
-        doc.setDrawColor(200, 200, 200)
-        doc.rect(x, y, item.width, item.height, 'DF')
-      }
-
-      if (item.title !== null) {
-        doc.setFontSize(titleFontSize)
-        const titleLines = doc.splitTextToSize(item.title, item.width)
-        doc.text(titleLines, x, y + titleLineHeight)
-        doc.setFontSize(fontSize)
-        doc.text(item.bodyLines, x, y + titleLineHeight + 4 + bodyLineHeight)
-      } else {
-        doc.setFontSize(fontSize)
-        doc.text(item.bodyLines, x, y + bodyLineHeight)
-      }
-    }
+    renderPage(doc, result.pages[pi], meta, margin, titleFontSize, fontSize, debug)
   }
 
   doc.save(output)

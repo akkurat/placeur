@@ -1,2 +1,5 @@
 export { placeur } from './placeur.js'
-export type { Bin, Block, ColumnLayout, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult } from './api-types.js'
+export { flowLayout } from './pack-flow.js'
+export type {
+  Bin, Block, ColumnLayout, PlacedBin, PlacedBlock, PlaceurOptions, PlaceurResult, FlowLayoutResult,
+} from './api-types.js'

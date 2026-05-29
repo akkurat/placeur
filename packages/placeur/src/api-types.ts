@@ -11,6 +11,12 @@ export interface Block {
   heightForWidth(width: number): number
   minWidth?: number
   maxWidth?: number
+  span?: number
+}
+
+export interface FlowLayoutResult {
+  pages: PlacedBlock[][]
+  unpacked: Block[]
 }
 
 export interface ColumnLayout {
