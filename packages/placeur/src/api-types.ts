@@ -14,6 +14,11 @@ export interface Block {
   span?: number
 }
 
+export interface FlowLayoutOptions {
+  breakPenalty?: number
+  wastePenalty?: number
+}
+
 export interface FlowLayoutResult {
   pages: PlacedBlock[][]
   unpacked: Block[]

@@ -1,6 +1,9 @@
-import type { Bin, Block, FlowLayoutResult, PlacedBlock } from './api-types.js'
+import type { Bin, Block, FlowLayoutOptions, FlowLayoutResult, PlacedBlock } from './api-types.js'
 
-export function flowLayout(bin: Bin, blocks: Block[]): FlowLayoutResult {
+export function flowLayout(bin: Bin, blocks: Block[], options?: FlowLayoutOptions): FlowLayoutResult {
+  const breakPenalty = options?.breakPenalty ?? Infinity
+  const wastePenalty = options?.wastePenalty ?? 0
+
   const colCount = bin.columns?.count ?? 1
   const gutter = bin.columns?.gutter ?? 0
   const colWidth = (bin.width - gutter * (colCount - 1)) / colCount
@@ -13,6 +16,22 @@ export function flowLayout(bin: Bin, blocks: Block[]): FlowLayoutResult {
   const unpacked: Block[] = []
   let page: PlacedBlock[] = []
   let curCol = 0
+
+  function wasteAfterPlacement(start: number, span: number, maxY: number, h: number): number {
+    let waste = 0
+    for (let c = 0; c < colCount; c++) {
+      const colEnd = (c >= start && c < start + span) ? maxY + h : cursor[c]
+      waste += bin.height - colEnd
+    }
+    return waste
+  }
+
+  function isPlacementAcceptable(start: number, span: number, maxY: number, h: number): boolean {
+    if (page.length === 0) return true
+    if (breakPenalty === Infinity) return true
+    const waste = wasteAfterPlacement(start, span, maxY, h)
+    return wastePenalty * waste <= breakPenalty
+  }
 
   for (const block of blocks) {
     const span = Math.max(1, Math.min(block.span ?? 1, colCount))
@@ -32,7 +51,7 @@ export function flowLayout(bin: Bin, blocks: Block[]): FlowLayoutResult {
         for (let c = start; c < start + span; c++) {
           if (cursor[c] > maxY) maxY = cursor[c]
         }
-        if (maxY + h <= bin.height) {
+        if (maxY + h <= bin.height && isPlacementAcceptable(start, span, maxY, h)) {
           const x = start * (colWidth + gutter)
           placed = { block, width: w, height: h, x, y: maxY }
           for (let c = start; c < start + span; c++) {
@@ -51,7 +70,7 @@ export function flowLayout(bin: Bin, blocks: Block[]): FlowLayoutResult {
           for (let c = start; c < start + span; c++) {
             if (cursor[c] > maxY) maxY = cursor[c]
           }
-          if (maxY + h <= bin.height) {
+          if (maxY + h <= bin.height && isPlacementAcceptable(start, span, maxY, h)) {
             const x = start * (colWidth + gutter)
             placed = { block, width: w, height: h, x, y: maxY }
             for (let c = start; c < start + span; c++) {

@@ -1,4 +1,4 @@
-import { flowLayout } from 'placeur'
+import { flowLayout, type FlowLayoutOptions } from 'placeur'
 import { jsPDF } from 'jspdf'
 import { findFiles } from './io.js'
 import { sectionsToBlocks, type BlockMeta } from './layout.js'
@@ -17,6 +17,8 @@ export interface PlaceurPdfOptions {
   margin?: number
   orientation?: Orientation
   debug?: boolean
+  breakPenalty?: number
+  wastePenalty?: number
 }
 
 export { findFiles } from './io.js'
@@ -98,7 +100,10 @@ export function generatePdf(options: PlaceurPdfOptions): jsPDF {
   )
 
   const bin = { width: usableWidth, height: usableHeight, columns: { count: columns, gutter } }
-  const result = flowLayout(bin, blocks)
+  const flowOptions: FlowLayoutOptions = {}
+  if (options.breakPenalty !== undefined) flowOptions.breakPenalty = options.breakPenalty
+  if (options.wastePenalty !== undefined) flowOptions.wastePenalty = options.wastePenalty
+  const result = flowLayout(bin, blocks, flowOptions)
 
   for (let pi = 0; pi < result.pages.length; pi++) {
     if (pi > 0) doc.addPage()
