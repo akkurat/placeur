@@ -20,44 +20,52 @@ export function packIntrinsicWidth(page: Bin, blocks: IntrinsicBlock[]): PlacedB
       return { block, w, h }
     })
 
-    const pages: PlacedBlock[][] = []
-    let remaining = [...entries]
+    const totalArea = entries.reduce((sum, e) => sum + e.w * e.h, 0)
+    let numPages = Math.max(1, Math.ceil(totalArea / (page.width * page.height)))
 
-    while (remaining.length > 0) {
-      const boxToEntry = new Map<Box2D, Entry>()
-      const packBoxes: Box2D[] = remaining.map(e => {
-        const box: Box2D = { width: e.w, height: e.h, constrainRotation: true }
-        boxToEntry.set(box, e)
-        return box
-      })
+    const boxToEntry = new Map<Box2D, Entry>()
+    const packBoxes: Box2D[] = entries.map(e => {
+      const box: Box2D = { width: e.w, height: e.h, constrainRotation: true }
+      boxToEntry.set(box, e)
+      return box
+    })
 
-      const result = pack2D({
-        bins: [{ width: page.width, height: page.height }, { width: page.width, height: page.height }],
+    let result: ReturnType<typeof pack2D>
+    for (let i=0;i<10;i++) {
+      result = pack2D({
+        bins: Array.from({ length: numPages }, () => ({ width: page.width, height: page.height })),
         boxes: packBoxes,
       })
 
-      const pageBlocks: PlacedBlock[] = []
-      const packedSet = new Set<Entry>()
+      const unpacked = result.unpackedBoxes ?? []
+      if (unpacked.length === 0) break
 
-      const packedBin = result.packedBins[0]
-      if (packedBin) {
-        for (const pb of packedBin.boxes) {
-          const entry = boxToEntry.get(pb.sourceBox as Box2D)
-          if (entry) {
-            pageBlocks.push({
-              block: entry.block,
-              width: pb.width,
-              height: pb.height,
-              x: pb.x,
-              y: pb.y,
-            })
-            packedSet.add(entry)
-          }
+      for (const box of unpacked) {
+        const entry = boxToEntry.get(box as Box2D)
+        if (entry && entry.h > page.height) {
+          throw Error(`block too tall for page: ${entry.h} > ${page.height}`)
         }
       }
 
+      numPages++
+    }
+
+    const pages: PlacedBlock[][] = []
+    for (const packedBin of result.packedBins) {
+      const pageBlocks: PlacedBlock[] = []
+      for (const pb of packedBin.boxes) {
+        const entry = boxToEntry.get(pb.sourceBox as Box2D)
+        if (entry) {
+          pageBlocks.push({
+            block: entry.block,
+            width: pb.width,
+            height: pb.height,
+            x: pb.x,
+            y: pb.y,
+          })
+        }
+      }
       pages.push(pageBlocks)
-      remaining = remaining.filter(e => !packedSet.has(e))
     }
 
     const totalUsed = pages.reduce((sum, pageBlocks) =>

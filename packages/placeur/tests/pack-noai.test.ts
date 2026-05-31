@@ -113,14 +113,14 @@ Third one.`,
 
         const blocks = texts.map((t, i) => new AsciiBlock(t, `block-${i}`))
 
-        const pageW = 100
-        const pageH = 30 
+        const pageW = 80
+        const pageH = 50
         const pages = packIntrinsicWidth({ width: pageW, height: pageH }, blocks)
 
         
 
         const ascii = renderAsciiPages(pages, pageW, pageH)
-        const outDir = join(__dirname, 'output')
+        const outDir = join(__dirname, 'test-output')
         mkdirSync(outDir, { recursive: true })
         writeFileSync(join(outDir, 'pack-intrinsic-widths.txt'), ascii, 'utf-8')
     })
