@@ -15,18 +15,27 @@ interface FlowBlock {
 // maybe this belongs to testing only
 
 export class AsciiBlock implements FlowBlock {
+    id: string;
     text: string;
     readonly originalLines: string[];
 
-    constructor(text: string) {
+    constructor(text: string, id?: string) {
+        this.id = id ?? `ascii-${Math.random().toString(36).slice(2, 10)}`
         this.text = text
         this.originalLines = this.text.split("\n")
     }
+
+    heightForWidth(width: number): number {
+        return this.height(width).height
+    }
+
     getLineSizes() {
        // in ascii width exactly equal to character count 
         const sizes = this.originalLines.map(l=>l.length)
         return sizes
     }
+
+    // todo: metric for area efficientcy
     
     // we take as a with just the number of blocks
     // and height is the lines its using
